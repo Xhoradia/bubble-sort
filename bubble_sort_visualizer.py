@@ -44,7 +44,8 @@ class BubbleSortVisualizer:
             self.root,
             text="Bitte geben Sie fünf Zahlen ein (z. B. 8, 12, 88, 75, 106):",
         )
-        self.input_entry = tk.Entry(self.root, width=50)
+        self.input_frame = tk.Frame(self.root)
+        self.input_entries: List[tk.Entry] = []
 
         # Steuerungs-Buttons für die Animation
         self.button_frame = tk.Frame(self.root)
@@ -95,13 +96,54 @@ class BubbleSortVisualizer:
         """Platziert alle Widgets im Fenster."""
 
         self.input_label.pack(pady=(15, 5))
-        self.input_entry.pack()
+
+        self.input_frame.pack(pady=(0, 10))
+        for column in range(5):
+            entry = tk.Entry(self.input_frame, width=6, justify="center")
+            entry.grid(row=0, column=column, padx=5)
+            self.input_entries.append(entry)
+
         self.canvas.pack(pady=20)
+
+        self._build_legend()
 
         self.start_button.pack(side=tk.LEFT, padx=5)
         self.pause_button.pack(side=tk.LEFT, padx=5)
         self.reset_button.pack(side=tk.LEFT, padx=5)
         self.button_frame.pack(pady=10)
+
+        if self.input_entries:
+            self.input_entries[0].focus_set()
+
+    def _build_legend(self) -> None:
+        """Erzeugt eine Legende für die verwendeten Balkenfarben."""
+
+        legend_items = [
+            (self.DEFAULT_COLOR, "Unsortiert"),
+            (self.COMPARE_COLOR, "Vergleich"),
+            (self.SWAP_COLOR, "Tausch"),
+            (self.SORTED_COLOR, "Sortiert"),
+        ]
+
+        legend_frame = tk.Frame(self.root)
+        legend_frame.pack(pady=(0, 10))
+
+        for color, description in legend_items:
+            item_frame = tk.Frame(legend_frame)
+            item_frame.pack(side=tk.LEFT, padx=10)
+
+            color_box = tk.Label(
+                item_frame,
+                bg=color,
+                width=2,
+                height=1,
+                relief=tk.SOLID,
+                bd=1,
+            )
+            color_box.pack(side=tk.LEFT, padx=(0, 4))
+
+            text_label = tk.Label(item_frame, text=description)
+            text_label.pack(side=tk.LEFT)
 
     # ------------------------------------------------------------------
     # Bedienlogik
@@ -112,7 +154,7 @@ class BubbleSortVisualizer:
         if self.is_running:
             return  # Mehrfachstarts vermeiden
 
-        numbers = self._parse_numbers(self.input_entry.get())
+        numbers = self._parse_numbers()
         if numbers is None:
             return
 
@@ -174,7 +216,8 @@ class BubbleSortVisualizer:
         self.bar_rects.clear()
         self.bar_texts.clear()
 
-        self.input_entry.delete(0, tk.END)
+        for entry in self.input_entries:
+            entry.delete(0, tk.END)
 
         self.start_button.config(state=tk.NORMAL)
         self.pause_button.config(state=tk.DISABLED, text="Pause")
@@ -182,27 +225,31 @@ class BubbleSortVisualizer:
     # ------------------------------------------------------------------
     # Datenverarbeitung
     # ------------------------------------------------------------------
-    def _parse_numbers(self, text: str) -> Optional[List[int]]:
-        """Überführt die Benutzereingabe in eine Liste von fünf ganzen Zahlen."""
+    def _parse_numbers(self) -> Optional[List[int]]:
+        """Liest fünf einzelne Eingabefelder aus und wandelt sie in ganze Zahlen um."""
 
-        raw_values = [part.strip() for part in text.replace(";", ",").split(",") if part.strip()]
-
-        if len(raw_values) != 5:
-            messagebox.showerror(
-                "Eingabefehler",
-                "Bitte geben Sie genau fünf Zahlen ein, getrennt durch Kommas.",
-            )
-            return None
+        raw_values = []
+        for index, entry in enumerate(self.input_entries, start=1):
+            value = entry.get().strip()
+            if not value:
+                messagebox.showerror(
+                    "Eingabefehler",
+                    "Bitte füllen Sie alle fünf Zahlenfelder aus.",
+                )
+                entry.focus_set()
+                return None
+            raw_values.append((index, value))
 
         numbers: List[int] = []
-        for value in raw_values:
+        for index, value in raw_values:
             try:
                 numbers.append(int(value))
             except ValueError:
                 messagebox.showerror(
                     "Eingabefehler",
-                    f"'{value}' ist keine gültige ganze Zahl.",
+                    f"Feld {index}: '{value}' ist keine gültige ganze Zahl.",
                 )
+                self.input_entries[index - 1].focus_set()
                 return None
 
         return numbers
