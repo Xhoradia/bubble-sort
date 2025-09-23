@@ -26,6 +26,9 @@ class SortingVisualizer:
     SWAP_COLOR = "#f85f5f"  # Vertauschung/Schreiben (rot)
     SORTED_COLOR = "#2ecc71"  # Sortiert (grün)
 
+    DEFAULT_ANIMATION_DELAY_MS = 800
+    TIMER_UPDATE_INTERVAL_MS = 20
+
     BAR_PADDING = 40  # Abstand links und rechts im Canvas
 
     def __init__(self) -> None:
@@ -160,6 +163,8 @@ class SortingVisualizer:
         }
         self.algorithm_var = tk.StringVar(value=self.algorithm_options[0][0])
         self.algorithm_buttons: List[tk.Radiobutton] = []
+        self.algorithm_info_title_var = tk.StringVar(value="")
+        self.algorithm_info_title_label: Optional[tk.Label] = None
         self.algorithm_info_label: Optional[tk.Label] = None
 
         # Statistik-Elemente
@@ -188,8 +193,7 @@ class SortingVisualizer:
         )
 
         # Variablen zur Steuerung der Animation
-        self.animation_speed_ms = 800  # Zeitabstand zwischen den Schritten
-        self.speed_var = tk.IntVar(value=self.animation_speed_ms)
+        self.animation_speed_ms = self.DEFAULT_ANIMATION_DELAY_MS
         self.step_generator: Optional[StepGenerator] = None
         self.after_id: Optional[str] = None
         self.is_running = False
@@ -235,7 +239,6 @@ class SortingVisualizer:
 
         self._build_legend()
         self._build_algorithm_selector()
-        self._build_speed_controls()
         self._build_info_panel()
 
         self.start_button.pack(side=tk.LEFT, padx=5)
@@ -296,27 +299,6 @@ class SortingVisualizer:
             button.grid(row=row, column=column, sticky="w", padx=10, pady=2)
             self.algorithm_buttons.append(button)
 
-    def _build_speed_controls(self) -> None:
-        """Erzeugt den Geschwindigkeitsregler."""
-
-        speed_frame = tk.Frame(self.left_frame)
-        speed_frame.pack(pady=(0, 10))
-
-        speed_label = tk.Label(speed_frame, text="Geschwindigkeit (ms pro Schritt)")
-        speed_label.pack()
-
-        speed_scale = tk.Scale(
-            speed_frame,
-            from_=100,
-            to=1500,
-            resolution=50,
-            orient=tk.HORIZONTAL,
-            variable=self.speed_var,
-            command=self._update_speed,
-            length=260,
-        )
-        speed_scale.pack()
-
     def _build_info_panel(self) -> None:
         """Erzeugt die rechte Seitenleiste mit Zeit- und Infobox."""
 
@@ -338,13 +320,26 @@ class SortingVisualizer:
         info_frame = tk.LabelFrame(self.right_frame, text="Algorithmus-Info")
         info_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
+        self.algorithm_info_title_label = tk.Label(
+            info_frame,
+            textvariable=self.algorithm_info_title_var,
+            font=("Helvetica", 13, "bold"),
+            anchor="w",
+            justify=tk.LEFT,
+        )
+        self.algorithm_info_title_label.pack(
+            anchor="w", padx=10, pady=(8, 0)
+        )
+
         self.algorithm_info_label = tk.Label(
             info_frame,
             justify=tk.LEFT,
             anchor="nw",
             wraplength=260,
         )
-        self.algorithm_info_label.pack(fill=tk.BOTH, expand=True, padx=10, pady=8)
+        self.algorithm_info_label.pack(
+            fill=tk.BOTH, expand=True, padx=10, pady=(4, 8)
+        )
 
         results_frame = tk.LabelFrame(self.right_frame, text="Rundenzeiten")
         results_frame.pack(fill=tk.BOTH, expand=False)
@@ -383,6 +378,10 @@ class SortingVisualizer:
             return
 
         key = self.algorithm_var.get()
+        title = self.algorithm_labels.get(key, key)
+        if self.algorithm_info_title_var is not None:
+            self.algorithm_info_title_var.set(title)
+
         info = self.algorithm_information.get(key)
         if not info:
             self.algorithm_info_label.config(
@@ -429,7 +428,7 @@ class SortingVisualizer:
         self.step_generator = generator_func(self.current_data)
         self.is_running = True
         self.is_paused = False
-        self.animation_speed_ms = max(10, int(self.speed_var.get()))
+        self.animation_speed_ms = self.DEFAULT_ANIMATION_DELAY_MS
         self.pause_button.config(state=tk.NORMAL, text="Pause")
         self.start_button.config(state=tk.DISABLED)
         self._set_algorithm_buttons_state(tk.DISABLED)
@@ -486,6 +485,10 @@ class SortingVisualizer:
         self.bar_rects.clear()
         self.bar_texts.clear()
 
+        self.run_history.clear()
+        self.total_runs = 0
+        self._update_results_table()
+
         for entry in self.input_entries:
             entry.delete(0, tk.END)
 
@@ -498,15 +501,6 @@ class SortingVisualizer:
 
         for button in self.algorithm_buttons:
             button.config(state=state)
-
-    def _update_speed(self, value: str) -> None:
-        """Aktualisiert die Animationsgeschwindigkeit anhand des Sliders."""
-
-        try:
-            self.animation_speed_ms = max(10, int(float(value)))
-        except (TypeError, ValueError):
-            # Ungültige Eingaben werden ignoriert.
-            pass
 
     # ------------------------------------------------------------------
     # Zeitmessung und Auswertung
@@ -565,7 +559,9 @@ class SortingVisualizer:
             return
 
         self._update_timer_label(self._current_elapsed_ms())
-        self.timer_after_id = self.root.after(50, self._schedule_timer_update)
+        self.timer_after_id = self.root.after(
+            self.TIMER_UPDATE_INTERVAL_MS, self._schedule_timer_update
+        )
 
     def _cancel_timer_callback(self) -> None:
         """Bricht einen geplanten Timer-Callback sicher ab."""
