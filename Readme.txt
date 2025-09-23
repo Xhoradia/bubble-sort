@@ -19,8 +19,8 @@ Perfekt für Einsteiger, die Sortieralgorithmen Schritt für Schritt verstehen m
 - Steuerung:
   - Start – startet die Animation
   - Pause/Fortsetzen – stoppt und setzt fort
-  - Reset – Eingabe neu beginnen
-  - Geschwindigkeit – Regler für Animations-Tempo
+  - Reset – Eingabe neu beginnen (inkl. geleertem Log)
+- Zeitmessung: Exakte Stoppuhr, die automatisch mit dem Sortiervorgang stoppt
 - Schrittlogik: Alle Algorithmen liefern fein granular Schritte, sodass die Visualisierung konsistent bleibt
 
 🛠️ Voraussetzungen
