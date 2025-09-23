@@ -1,41 +1,27 @@
-Ziel
-Dieser Agent soll ein Python-Programm entwickeln und pflegen, das den Bubble Sort Algorithmus grafisch darstellt.
-Das Projekt dient Lern- und Demonstrationszwecken und soll Einsteigern helfen, Sortierverfahren Schritt für Schritt zu verstehen.
+AGENTS.md
 
-Kontext für den Agent
+Goal
+This agent should develop and maintain a Python program that graphically visualizes and animates multiple sorting algorithms: Bubble Sort, Selection Sort, Insertion Sort, Merge Sort, Quick Sort, and Heap Sort. The project is designed for learning and demonstration purposes, helping beginners understand sorting algorithms step by step.
 
-Sprache & Umgebung: Python 3.8+, Standardbibliothek (insbesondere tkinter für GUI)
+Context
+- Language & Environment: Python 3.8+, standard library only (tkinter for GUI/animation)
+- Input: 5 freely chosen numbers (also multi-digit, e.g., 8, 12, 88, 75, 106)
+- Visualization: Bar chart in a Canvas, consistent color codes (Gray / Yellow / Red / Green)
+- UI Controls: Start, Pause/Resume, Reset, Speed slider
+- Algorithm Selection: Option buttons (radio buttons) for Bubble, Selection, Insertion, Merge, Quick, Heap
+- Architecture: GUI separated from algorithm logic; each algorithm produces a step sequence (comparisons, swaps, markings) consumed by the visualizer
 
-Projektstruktur: Einfaches Skript (bubble_sort_visualizer.py), keine externen Abhängigkeiten
+Agent Behavior
+- Clear, well-structured, and commented code; use meaningful variable names
+- Didactics: Explicitly model the steps of algorithms (events with type, indices, optional values/colors)
+- Robustness: Validate input (exactly 5 integers), report errors via dialogs
+- Consistency: Unified event and color semantics across all algorithms
+- Performance: Animation using tkinter's after-callbacks with adjustable delay, no UI blocking
+- Extensibility: New algorithms can be added as step generators without changing the renderer
 
-Benutzeroberfläche:
-
-Eingabe von 5 Zahlen (ein- oder mehrstellig, z. B. 8, 12, 88, 75, 106)
-
-Visualisierung als Balkendiagramm
-
-Animation jedes Bubble-Sort-Schrittes
-
-Verhalten des Agents
-
-Klarheit: Sauberen, gut lesbaren Python-Code schreiben
-
-Didaktik: Code so gestalten, dass er leicht verständlich ist (Kommentare, sprechende Variablennamen)
-
-Benutzerfreundlichkeit: Einfache GUI, direkte Eingabeaufforderungen, klare Fehlermeldungen
-
-Animation:
-
-Vergleiche und Swaps sichtbar machen (Farben verwenden)
-
-Schrittweises Fortschreiten im Algorithmus
-
-Abschlusszustand klar kennzeichnen (z. B. grün für sortiert)
-
-Aufgabe des Agents
-
-Den Algorithmus korrekt implementieren
-
-Die einzelnen Schritte so aufbereiten, dass Nutzer sie visuell nachvollziehen können
-
-Eine einfache, stabile und lehrreiche Anwendung bereitstellen
+Tasks
+- Implement the six sorting algorithms as step generators (yielding comparison/swap/mark events)
+- Build a GUI with input fields, option buttons for algorithm selection, control buttons, and a speed slider
+- Create a renderer that translates events into Canvas updates (set colors, swap bar positions, mark as final)
+- Ensure that pause/resume and reset correctly manage the animation state
+- Perform manual tests for typical and edge cases
