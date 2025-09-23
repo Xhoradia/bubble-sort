@@ -9,8 +9,9 @@ sortierte Werte.
 
 from __future__ import annotations
 
+import time
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 from typing import Callable, Dict, Generator, Iterable, List, Optional, Set, Tuple
 
 Step = Tuple[str, int, Optional[int]]
@@ -31,11 +32,15 @@ class SortingVisualizer:
         self.root = tk.Tk()
         self.root.title("Sorting Visualizer")
 
+        self.content_frame = tk.Frame(self.root)
+        self.left_frame = tk.Frame(self.content_frame)
+        self.right_frame = tk.Frame(self.content_frame)
+
         # Der Canvas stellt die Balkendiagramm-Darstellung zur Verfügung.
         self.canvas_width = 600
         self.canvas_height = 320
         self.canvas = tk.Canvas(
-            self.root,
+            self.left_frame,
             width=self.canvas_width,
             height=self.canvas_height,
             bg="white",
@@ -44,10 +49,10 @@ class SortingVisualizer:
 
         # GUI-Elemente für die Benutzereingabe
         self.input_label = tk.Label(
-            self.root,
+            self.left_frame,
             text="Bitte geben Sie fünf Zahlen ein (z. B. 8, 12, 88, 75, 106):",
         )
-        self.input_frame = tk.Frame(self.root)
+        self.input_frame = tk.Frame(self.left_frame)
         self.input_entries: List[tk.Entry] = []
 
         # Algorithmus-Auswahl
@@ -64,11 +69,107 @@ class SortingVisualizer:
         self.algorithm_generators: Dict[str, Callable[[Iterable[int]], StepGenerator]] = {
             key: generator for key, _, generator in self.algorithm_options
         }
+        self.algorithm_labels: Dict[str, str] = {
+            key: label for key, label, _ in self.algorithm_options
+        }
+        self.algorithm_information: Dict[str, Dict[str, object]] = {
+            "bubble": {
+                "description": (
+                    "Vergleicht benachbarte Werte und vertauscht sie bei Bedarf; "
+                    "größere Elemente \"blubbern\" nach oben."
+                ),
+                "advantages": [
+                    "Sehr leicht zu verstehen und zu implementieren",
+                    "Erkennt bereits sortierte Listen schnell dank Abbruchbedingung",
+                ],
+                "disadvantages": [
+                    "Sehr ineffizient bei größeren Datensätzen (O(n²))",
+                    "Viele unnötige Vergleiche und Vertauschungen",
+                ],
+            },
+            "selection": {
+                "description": (
+                    "Sucht in jedem Durchlauf das kleinste verbleibende Element und setzt es an "
+                    "die richtige Position."
+                ),
+                "advantages": [
+                    "Wenig Speicherbedarf und deterministische Anzahl an Vertauschungen",
+                    "Einfache Schritt-für-Schritt-Nachvollziehbarkeit",
+                ],
+                "disadvantages": [
+                    "Benötigt viele Vergleiche (O(n²))",
+                    "Reagiert nicht auf bereits teilweise sortierte Listen",
+                ],
+            },
+            "insertion": {
+                "description": (
+                    "Fügt jedes neue Element an der passenden Stelle in den bereits sortierten "
+                    "linken Teil ein."
+                ),
+                "advantages": [
+                    "Sehr effizient für kleine oder fast sortierte Listen",
+                    "Stabile Sortierung ohne zusätzliche Datenstrukturen",
+                ],
+                "disadvantages": [
+                    "Quadratische Laufzeit im schlechtesten Fall",
+                    "Viele Verschiebungen bei stark unsortierten Listen",
+                ],
+            },
+            "merge": {
+                "description": (
+                    "Teilt die Liste rekursiv, sortiert die Hälften und fügt sie geordnet "
+                    "wieder zusammen."
+                ),
+                "advantages": [
+                    "Sehr gute Laufzeit O(n log n) auch im schlechtesten Fall",
+                    "Stabile Sortierung mit klarer Divide-and-Conquer-Struktur",
+                ],
+                "disadvantages": [
+                    "Benötigt zusätzlichen Speicher für Hilfsarrays",
+                    "Komplexer zu implementieren als einfache Quadratalgorithmen",
+                ],
+            },
+            "quick": {
+                "description": (
+                    "Wählt ein Pivot, partitioniert die Liste in kleinere und größere Werte und "
+                    "sortiert die Teilbereiche rekursiv."
+                ),
+                "advantages": [
+                    "Sehr schnell in der Praxis dank In-Place-Partitionierung",
+                    "Gute Cache-Lokalität und geringe Hilfsspeichernutzung",
+                ],
+                "disadvantages": [
+                    "Schlechtester Fall O(n²) bei ungünstiger Pivot-Wahl",
+                    "Nicht stabil ohne zusätzliche Maßnahmen",
+                ],
+            },
+            "heap": {
+                "description": (
+                    "Organisiert die Werte als Heap und entnimmt wiederholt das größte Element an "
+                    "das Ende der Liste."
+                ),
+                "advantages": [
+                    "Robuste Laufzeit O(n log n) unabhängig von der Eingabe",
+                    "Sortiert In-Place mit konstantem zusätzlichen Speicher",
+                ],
+                "disadvantages": [
+                    "Komplexere Datenstruktur als Ausgangspunkt",
+                    "Nicht stabil und schwerer anschaulich zu verfolgen",
+                ],
+            },
+        }
         self.algorithm_var = tk.StringVar(value=self.algorithm_options[0][0])
         self.algorithm_buttons: List[tk.Radiobutton] = []
+        self.algorithm_info_label: Optional[tk.Label] = None
+
+        # Statistik-Elemente
+        self.results_tree: Optional[ttk.Treeview] = None
+        self.run_history: List[Tuple[int, str, float]] = []
+        self.total_runs = 0
+        self.active_algorithm_key: Optional[str] = None
 
         # Steuerungs-Buttons für die Animation
-        self.button_frame = tk.Frame(self.root)
+        self.button_frame = tk.Frame(self.left_frame)
         self.start_button = tk.Button(
             self.button_frame,
             text="Start",
@@ -93,6 +194,10 @@ class SortingVisualizer:
         self.after_id: Optional[str] = None
         self.is_running = False
         self.is_paused = False
+        self.elapsed_time_ms = 0.0
+        self.timer_base_time: Optional[float] = None
+        self.timer_after_id: Optional[str] = None
+        self.timer_value_var = tk.StringVar(value="0 ms (0,00 s)")
 
         # Datenstrukturen für die Visualisierung
         self.current_data: List[int] = []
@@ -114,6 +219,10 @@ class SortingVisualizer:
     def _build_layout(self) -> None:
         """Platziert alle Widgets im Fenster."""
 
+        self.content_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
+        self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(20, 0))
+
         self.input_label.pack(pady=(15, 5))
 
         self.input_frame.pack(pady=(0, 10))
@@ -127,6 +236,7 @@ class SortingVisualizer:
         self._build_legend()
         self._build_algorithm_selector()
         self._build_speed_controls()
+        self._build_info_panel()
 
         self.start_button.pack(side=tk.LEFT, padx=5)
         self.pause_button.pack(side=tk.LEFT, padx=5)
@@ -146,7 +256,7 @@ class SortingVisualizer:
             (self.SORTED_COLOR, "Sortiert"),
         ]
 
-        legend_frame = tk.Frame(self.root)
+        legend_frame = tk.Frame(self.left_frame)
         legend_frame.pack(pady=(0, 10))
 
         for color, description in legend_items:
@@ -169,7 +279,7 @@ class SortingVisualizer:
     def _build_algorithm_selector(self) -> None:
         """Legt die Radiobuttons für die Algorithmuswahl an."""
 
-        options_frame = tk.LabelFrame(self.root, text="Sortierverfahren")
+        options_frame = tk.LabelFrame(self.left_frame, text="Sortierverfahren")
         options_frame.pack(pady=(0, 10), padx=20, fill=tk.X)
 
         for index, (key, label, _) in enumerate(self.algorithm_options):
@@ -179,6 +289,7 @@ class SortingVisualizer:
                 variable=self.algorithm_var,
                 value=key,
                 anchor="w",
+                command=self._update_algorithm_info,
             )
             row = index // 2
             column = index % 2
@@ -188,7 +299,7 @@ class SortingVisualizer:
     def _build_speed_controls(self) -> None:
         """Erzeugt den Geschwindigkeitsregler."""
 
-        speed_frame = tk.Frame(self.root)
+        speed_frame = tk.Frame(self.left_frame)
         speed_frame.pack(pady=(0, 10))
 
         speed_label = tk.Label(speed_frame, text="Geschwindigkeit (ms pro Schritt)")
@@ -205,6 +316,88 @@ class SortingVisualizer:
             length=260,
         )
         speed_scale.pack()
+
+    def _build_info_panel(self) -> None:
+        """Erzeugt die rechte Seitenleiste mit Zeit- und Infobox."""
+
+        timer_frame = tk.LabelFrame(self.right_frame, text="Zeitmessung")
+        timer_frame.pack(fill=tk.X, pady=(0, 10))
+
+        timer_label = tk.Label(timer_frame, text="Aktuelle Dauer:")
+        timer_label.pack(anchor="w", padx=10, pady=(8, 0))
+
+        timer_value = tk.Label(
+            timer_frame,
+            textvariable=self.timer_value_var,
+            font=("Helvetica", 14, "bold"),
+            anchor="w",
+            justify=tk.LEFT,
+        )
+        timer_value.pack(anchor="w", padx=10, pady=(2, 8))
+
+        info_frame = tk.LabelFrame(self.right_frame, text="Algorithmus-Info")
+        info_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+        self.algorithm_info_label = tk.Label(
+            info_frame,
+            justify=tk.LEFT,
+            anchor="nw",
+            wraplength=260,
+        )
+        self.algorithm_info_label.pack(fill=tk.BOTH, expand=True, padx=10, pady=8)
+
+        results_frame = tk.LabelFrame(self.right_frame, text="Rundenzeiten")
+        results_frame.pack(fill=tk.BOTH, expand=False)
+
+        columns = ("round", "algorithm", "time")
+        self.results_tree = ttk.Treeview(
+            results_frame,
+            columns=columns,
+            show="headings",
+            height=8,
+        )
+        self.results_tree.heading("round", text="Runde")
+        self.results_tree.heading("algorithm", text="Verfahren")
+        self.results_tree.heading("time", text="Zeit")
+        self.results_tree.column("round", width=90, anchor="w")
+        self.results_tree.column("algorithm", width=130, anchor="w")
+        self.results_tree.column("time", width=120, anchor="w")
+
+        scrollbar = ttk.Scrollbar(
+            results_frame,
+            orient=tk.VERTICAL,
+            command=self.results_tree.yview,
+        )
+        self.results_tree.configure(yscrollcommand=scrollbar.set)
+
+        self.results_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=8)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 10), pady=8)
+
+        self._update_algorithm_info()
+        self._update_results_table()
+
+    def _update_algorithm_info(self) -> None:
+        """Aktualisiert den Informationstext zum gewählten Algorithmus."""
+
+        if self.algorithm_info_label is None:
+            return
+
+        key = self.algorithm_var.get()
+        info = self.algorithm_information.get(key)
+        if not info:
+            self.algorithm_info_label.config(
+                text="Für dieses Verfahren liegt keine Beschreibung vor."
+            )
+            return
+
+        advantages = "\n".join(f"- {item}" for item in info.get("advantages", []))
+        disadvantages = "\n".join(f"- {item}" for item in info.get("disadvantages", []))
+        text = (
+            f"{info.get('description', '')}\n\n"
+            f"Vorteile:\n{advantages}\n\n"
+            f"Nachteile:\n{disadvantages}"
+        )
+        self.algorithm_info_label.config(text=text)
 
     # ------------------------------------------------------------------
     # Bedienlogik
@@ -232,6 +425,7 @@ class SortingVisualizer:
             )
             return
 
+        self.active_algorithm_key = algorithm_key
         self.step_generator = generator_func(self.current_data)
         self.is_running = True
         self.is_paused = False
@@ -240,6 +434,7 @@ class SortingVisualizer:
         self.start_button.config(state=tk.DISABLED)
         self._set_algorithm_buttons_state(tk.DISABLED)
 
+        self._start_timer()
         self.perform_next_step()
 
     def pause_or_resume(self) -> None:
@@ -251,6 +446,7 @@ class SortingVisualizer:
         if self.is_paused:
             self.is_paused = False
             self.pause_button.config(text="Pause")
+            self._resume_timer()
             self.perform_next_step()
         else:
             self.is_paused = True
@@ -261,6 +457,7 @@ class SortingVisualizer:
                 except tk.TclError:
                     pass
                 self.after_id = None
+            self._pause_timer()
 
     def reset(self) -> None:
         """Setzt die Anwendung in den Ausgangszustand zurück."""
@@ -272,9 +469,11 @@ class SortingVisualizer:
                 pass
             self.after_id = None
 
+        self._reset_timer()
         self.is_running = False
         self.is_paused = False
         self.step_generator = None
+        self.active_algorithm_key = None
         self.current_data = []
         self.sorted_indices.clear()
         self.value_min = 0
@@ -308,6 +507,135 @@ class SortingVisualizer:
         except (TypeError, ValueError):
             # Ungültige Eingaben werden ignoriert.
             pass
+
+    # ------------------------------------------------------------------
+    # Zeitmessung und Auswertung
+    # ------------------------------------------------------------------
+    def _start_timer(self) -> None:
+        """Initialisiert die Stoppuhr für einen neuen Durchlauf."""
+
+        self.elapsed_time_ms = 0.0
+        self.timer_base_time = time.perf_counter()
+        self._cancel_timer_callback()
+        self._update_timer_label(0.0)
+        self._schedule_timer_update()
+
+    def _pause_timer(self) -> None:
+        """Hält die Stoppuhr an, behält aber den bisherigen Wert."""
+
+        if self.timer_base_time is not None:
+            self.elapsed_time_ms = self._current_elapsed_ms()
+            self.timer_base_time = None
+        self._cancel_timer_callback()
+        self._update_timer_label(self.elapsed_time_ms)
+
+    def _resume_timer(self) -> None:
+        """Setzt die Stoppuhr nach einer Pause fort."""
+
+        if not self.is_running:
+            return
+        if self.timer_base_time is None:
+            self.timer_base_time = time.perf_counter()
+        self._cancel_timer_callback()
+        self._schedule_timer_update()
+
+    def _stop_timer(self) -> float:
+        """Beendet die Stoppuhr und gibt die gemessene Zeit in Millisekunden zurück."""
+
+        if self.timer_base_time is not None:
+            self.elapsed_time_ms = self._current_elapsed_ms()
+            self.timer_base_time = None
+        self._cancel_timer_callback()
+        self._update_timer_label(self.elapsed_time_ms)
+        return self.elapsed_time_ms
+
+    def _reset_timer(self) -> None:
+        """Setzt die Zeitmessung auf den Ausgangswert zurück."""
+
+        self.timer_base_time = None
+        self.elapsed_time_ms = 0.0
+        self._cancel_timer_callback()
+        self._update_timer_label(0.0)
+
+    def _schedule_timer_update(self) -> None:
+        """Aktualisiert die Zeitanzeige während der Animation."""
+
+        if not self.is_running or self.is_paused or self.timer_base_time is None:
+            self.timer_after_id = None
+            return
+
+        self._update_timer_label(self._current_elapsed_ms())
+        self.timer_after_id = self.root.after(50, self._schedule_timer_update)
+
+    def _cancel_timer_callback(self) -> None:
+        """Bricht einen geplanten Timer-Callback sicher ab."""
+
+        if self.timer_after_id is not None:
+            try:
+                self.root.after_cancel(self.timer_after_id)
+            except tk.TclError:
+                pass
+            self.timer_after_id = None
+
+    def _current_elapsed_ms(self) -> float:
+        """Berechnet die aktuelle Zeitspanne in Millisekunden."""
+
+        if self.timer_base_time is None:
+            return self.elapsed_time_ms
+        delta = (time.perf_counter() - self.timer_base_time) * 1000.0
+        return self.elapsed_time_ms + delta
+
+    def _update_timer_label(self, elapsed_ms: float) -> None:
+        """Aktualisiert die Textanzeige des Timers."""
+
+        milliseconds = max(0.0, elapsed_ms)
+        seconds = milliseconds / 1000.0
+        seconds_text = f"{seconds:0.2f}".replace(".", ",")
+        display_text = f"{int(round(milliseconds))} ms ({seconds_text} s)"
+        self.timer_value_var.set(display_text)
+
+    def _record_run_result(self, elapsed_ms: float) -> None:
+        """Speichert das Ergebnis eines Durchlaufs für die Übersicht."""
+
+        if self.active_algorithm_key is None:
+            return
+
+        algorithm_label = self.algorithm_labels.get(
+            self.active_algorithm_key, self.active_algorithm_key
+        )
+        self.total_runs += 1
+        self.run_history.append((self.total_runs, algorithm_label, elapsed_ms))
+        if len(self.run_history) > 10:
+            self.run_history = self.run_history[-10:]
+
+        self._update_results_table()
+
+    def _update_results_table(self) -> None:
+        """Aktualisiert die Tabelle mit den gespeicherten Laufzeiten."""
+
+        if self.results_tree is None:
+            return
+
+        for entry in self.results_tree.get_children():
+            self.results_tree.delete(entry)
+
+        for run_number, label, elapsed_ms in self.run_history:
+            self.results_tree.insert(
+                "",
+                tk.END,
+                values=(
+                    f"Runde {run_number}",
+                    label,
+                    self._format_seconds(elapsed_ms),
+                ),
+            )
+
+    def _format_seconds(self, elapsed_ms: float) -> str:
+        """Formatiert Millisekunden als Sekunden mit deutschem Dezimaltrennzeichen."""
+
+        seconds = elapsed_ms / 1000.0
+        formatted = f"{seconds:0.2f}".replace(".", ",")
+        return f"{formatted} Sekunden"
 
     # ------------------------------------------------------------------
     # Datenverarbeitung
@@ -583,6 +911,9 @@ class SortingVisualizer:
     def _finish_sorting(self) -> None:
         """Wird aufgerufen, wenn alle Schritte abgearbeitet wurden."""
 
+        elapsed_ms = self._stop_timer()
+        self._record_run_result(elapsed_ms)
+        self.active_algorithm_key = None
         self.is_running = False
         self.is_paused = False
         self.after_id = None
