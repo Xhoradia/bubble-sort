@@ -9,8 +9,7 @@ Perfekt für Einsteiger, die Sortieralgorithmen Schritt für Schritt verstehen m
 - Eingabe: 5 Zahlen frei wählbar (ein- oder mehrstellig, z. B. 8, 12, 88, 75, 106)
 - Algorithmus-Auswahl: Über Option-Buttons (Radio-Buttons) wählbar:
   Bubble, Selection, Insertion, Merge, Quick, Heap
-- Visualisierung: Darstellung der Werte als Balkendiagramm
-- Animation: Jeder Vergleich und jeder Tausch/Schritt wird hervorgehoben
+- Visualisierung: Darstellung der Werte als Balkendiagramm mit farblicher Hervorhebung jeder Aktion
 - Farbcodierung:
   - Grau = Ausgangszustand
   - Gelb = Vergleich
@@ -20,7 +19,8 @@ Perfekt für Einsteiger, die Sortieralgorithmen Schritt für Schritt verstehen m
   - Start – startet die Animation
   - Pause/Fortsetzen – stoppt und setzt fort
   - Reset – Eingabe neu beginnen (inkl. geleertem Log)
-- Zeitmessung: Exakte Stoppuhr, die automatisch mit dem Sortiervorgang stoppt
+- Algorithmus-Info: Rechte Seitenleiste mit Beschreibung, Vorteilen/Nachteilen und Tabelle der letzten Rundenzeiten
+- Zeitmessung: Stoppuhr startet automatisch mit dem Lauf und hält exakt in dem Moment an, in dem der letzte Balken grün wird
 - Schrittlogik: Alle Algorithmen liefern fein granular Schritte, sodass die Visualisierung konsistent bleibt
 
 🛠️ Voraussetzungen

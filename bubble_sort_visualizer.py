@@ -208,6 +208,7 @@ class SortingVisualizer:
         self.sorted_indices: Set[int] = set()
         self.bar_rects: List[int] = []
         self.bar_texts: List[int] = []
+        self._is_finalizing_run = False
         self.value_min = 0
         self.value_max = 0
         self.value_range = 1
@@ -901,25 +902,45 @@ class SortingVisualizer:
         elif action == "mark_sorted":
             self._mark_sorted(first_index)
 
+        if not self.is_running or self.is_paused or self.step_generator is None:
+            return
+
         delay = max(10, int(self.animation_speed_ms))
         self.after_id = self.root.after(delay, self.perform_next_step)
 
     def _finish_sorting(self) -> None:
         """Wird aufgerufen, wenn alle Schritte abgearbeitet wurden."""
 
-        elapsed_ms = self._stop_timer()
-        self._record_run_result(elapsed_ms)
-        self.active_algorithm_key = None
-        self.is_running = False
-        self.is_paused = False
-        self.after_id = None
-        self.step_generator = None
-        self.pause_button.config(state=tk.DISABLED, text="Pause")
-        self.start_button.config(state=tk.NORMAL)
-        for index in range(len(self.current_data)):
-            if index not in self.sorted_indices:
-                self._mark_sorted(index)
-        self._set_algorithm_buttons_state(tk.NORMAL)
+        if self._is_finalizing_run:
+            return
+        if not self.is_running and self.step_generator is None:
+            return
+
+        self._is_finalizing_run = True
+
+        try:
+            if self.after_id is not None:
+                try:
+                    self.root.after_cancel(self.after_id)
+                except tk.TclError:
+                    pass
+                self.after_id = None
+
+            elapsed_ms = self._stop_timer()
+            self._record_run_result(elapsed_ms)
+            self.active_algorithm_key = None
+            self.is_running = False
+            self.is_paused = False
+            self.after_id = None
+            self.step_generator = None
+            self.pause_button.config(state=tk.DISABLED, text="Pause")
+            self.start_button.config(state=tk.NORMAL)
+            for index in range(len(self.current_data)):
+                if index not in self.sorted_indices:
+                    self._mark_sorted(index)
+            self._set_algorithm_buttons_state(tk.NORMAL)
+        finally:
+            self._is_finalizing_run = False
 
     def _highlight_compare(self, i: int, j: int) -> None:
         """Setzt die Farben der verglichenen Balken auf gelb."""
@@ -959,8 +980,17 @@ class SortingVisualizer:
         """Hebt einen Balken als endgültig sortiert hervor."""
 
         if 0 <= index < len(self.current_data):
+            was_new = index not in self.sorted_indices
             self.sorted_indices.add(index)
             self._set_bar_color(index, self.SORTED_COLOR)
+
+            if (
+                was_new
+                and not self._is_finalizing_run
+                and self.is_running
+                and len(self.sorted_indices) == len(self.current_data)
+            ):
+                self._finish_sorting()
 
     # ------------------------------------------------------------------
     # Zeichenhilfsfunktionen
